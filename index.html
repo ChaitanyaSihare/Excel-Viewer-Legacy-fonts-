@@ -851,6 +851,10 @@
             <input type="checkbox" id="dictionaryToggle" />
             <span data-i18n="dictionaryToggleLabel">बिना फॉन्ट-जानकारी वाले सेल में अंग्रेज़ी शब्दकोश से अनुमान लगाएं (जोखिम भरा — बंद रहना बेहतर)</span>
           </label>
+          <div style="padding: 0 14px 8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-secondary" id="aiAssistBtn" type="button" data-i18n="aiAssistLabel">अस्पष्ट शब्दों की जांच इस डिवाइस के AI से करें</button>
+            <span id="aiAssistStatus" style="color: var(--muted); font-size: .82rem;"></span>
+          </div>
           <div class="table-wrap">
             <table id="outputTable" aria-label="डेटा तालिका"></table>
           </div>
@@ -880,6 +884,7 @@
   <script src="js/converter.js"></script>
   <script src="js/processor.js"></script>
   <script src="js/data/dictionary.js"></script>
+  <script src="js/data/bigrams.js"></script>
   <script src="js/ui.js"></script>
 </body>
 </html>

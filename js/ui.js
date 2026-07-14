@@ -20,6 +20,8 @@
     const scrollTopBtn = document.getElementById('scrollTopBtn');
     const newFileBtn = document.getElementById('newFileBtn');
     const sheetEnglishToggle = document.getElementById('sheetEnglishToggle');
+    const aiAssistBtn = document.getElementById('aiAssistBtn');
+    const aiAssistStatus = document.getElementById('aiAssistStatus');
     const downloadHtmlBtn = document.getElementById('downloadHtmlBtn');
     const exportPdfBtn = document.getElementById('exportPdfBtn');
     const exportUnicodeBtn = document.getElementById('exportUnicodeBtn');
@@ -109,6 +111,11 @@
         newFileLabel: 'नई फाइल खोलें',
         searchPlaceholder: 'डेटा खोजें...',
         dictionaryToggleLabel: 'बिना फॉन्ट-जानकारी वाले सेल में अंग्रेज़ी शब्दकोश से अनुमान लगाएं (जोखिम भरा — बंद रहना बेहतर)',
+        aiAssistLabel: 'अस्पष्ट शब्दों की जांच इस डिवाइस के AI से करें',
+        aiAssistUnavailable: 'इस ब्राउज़र/डिवाइस पर कोई ऑन-डिवाइस AI उपलब्ध नहीं मिला। कुछ भी कहीं नहीं भेजा गया।',
+        aiAssistChecking: 'AI से जांच हो रही है... ({done}/{total})',
+        aiAssistDone: 'पूरा हुआ — {count} शब्द ठीक किए गए।',
+        aiAssistNoneFound: 'जांचने के लिए कोई अस्पष्ट शब्द नहीं मिला।',
         loadMoreLabel: 'और {count} पंक्तियाँ लोड करें',
       },
       en: {
@@ -187,6 +194,11 @@
         newFileLabel: 'Open new file',
         searchPlaceholder: 'Search data...',
         dictionaryToggleLabel: 'Guess using an English dictionary for cells with no font info (risky — best left off)',
+        aiAssistLabel: 'Check ambiguous words using this device\'s AI',
+        aiAssistUnavailable: 'No on-device AI was found on this browser/device. Nothing was sent anywhere.',
+        aiAssistChecking: 'Checking with AI... ({done}/{total})',
+        aiAssistDone: 'Done — {count} words corrected.',
+        aiAssistNoneFound: 'No ambiguous words found to check.',
         loadMoreLabel: 'Load {count} more rows',
       }
     };
@@ -335,7 +347,7 @@
     const KNOWN_ENGLISH_TERMS = new Set([
       'nil', 'rct', 'fir', 'ipc', 'crpc', 'sho', 'sp', 'dfo', 'ccf', 'pccf',
       'gpf', 'cpf', 'nps', 'pf', 'esi', 'gis', 'lic', 'pan', 'tds', 'ifsc',
-      'hra', 'da', 'ta', 'gst', 'nagpur',
+      'hra', 'da', 'ta', 'gst', 'nagpur', 'dt',
       'agar', 'malwa', 'alirajpur', 'anuppur', 'ashoknagar', 'balaghat',
       'barwani', 'betul', 'bhind', 'bhopal', 'burhanpur', 'chhatarpur',
       'chhindwara', 'damoh', 'datia', 'dewas', 'dhar', 'dindori', 'guna',
@@ -438,7 +450,8 @@
             const lower = piece.toLowerCase();
             const dictionaryHit = !trustedLegacy && useDictionaryGuess &&
               ENGLISH_DICTIONARY.has(lower) && lower.length >= 3;
-            if (userExceptions.has(lower) || dictionaryHit) {
+            const bigramHit = !trustedLegacy && looksStatisticallyEnglish(lower);
+            if (userExceptions.has(lower) || dictionaryHit || bigramHit) {
               return '<span class="run-normal-font" data-taggable="true" title="असली अंग्रेज़ी नहीं है? टैप करें">' + escapeHTML(piece) + '</span>';
             }
             const hint = trustedLegacy
@@ -473,9 +486,11 @@
       const mode = span.getAttribute('data-taggable');
       if (mode === 'unmark') {
         addUserException(word);
+        if (typeof learnWord === 'function') learnWord(word, true); // confirmed: real English
       } else {
         userExceptions.delete(word.toLowerCase());
         saveUserExceptions();
+        if (typeof learnWord === 'function') learnWord(word, false); // confirmed: actually Kruti Dev
       }
       const cell = span.closest('td, th');
       if (cell) {
@@ -551,6 +566,83 @@
         if (sheetEnglishToggle.checked) englishSheets.add(currentSheetName);
         else englishSheets.delete(currentSheetName);
         renderSheet(currentSheetName);
+      });
+    }
+
+    // ---- On-device AI assist (opt-in, explicit action only) ----
+    // This is deliberately NOT automatic and NOT a background process. It
+    // only runs when someone taps the button, and it only ever uses AI
+    // that's already built into THIS device's browser (Chrome's on-device
+    // Prompt API / Gemini Nano, where available) — never a server we run,
+    // never an API key, never a network request. If the device has no such
+    // AI, we say so plainly and do nothing else. This keeps the "yatharoop
+    // never sends your file anywhere" promise intact even when using AI:
+    // the file still never leaves the browser, because the AI itself is
+    // already sitting inside the browser.
+    async function getOnDeviceAISession() {
+      try {
+        if (typeof LanguageModel !== 'undefined') {
+          const avail = await LanguageModel.availability();
+          if (avail === 'unavailable') return null;
+          return await LanguageModel.create();
+        }
+        if (typeof window.ai !== 'undefined' && window.ai.languageModel) {
+          const caps = await window.ai.languageModel.capabilities();
+          if (caps.available === 'no') return null;
+          return await window.ai.languageModel.create();
+        }
+      } catch (err) {
+        console.error('on-device AI unavailable:', err);
+      }
+      return null;
+    }
+
+    async function askDeviceAIIsEnglish(session, word) {
+      const prompt = 'Answer with exactly one word, YES or NO. Is "' + word +
+        '" a real, standalone English word or abbreviation (not a fragment produced by ' +
+        'typing Hindi in the Kruti Dev keyboard layout, which reuses ASCII letters as ' +
+        'Devanagari glyph codes)? Word: ' + word;
+      try {
+        const response = await session.prompt(prompt);
+        return /^\s*yes/i.test(response);
+      } catch (err) {
+        return null; // treat a failed single query as "couldn't determine", not as a NO
+      }
+    }
+
+    if (aiAssistBtn) {
+      aiAssistBtn.addEventListener('click', async () => {
+        aiAssistBtn.disabled = true;
+        aiAssistStatus.textContent = '';
+        const session = await getOnDeviceAISession();
+        if (!session) {
+          aiAssistStatus.textContent = t('aiAssistUnavailable');
+          aiAssistBtn.disabled = false;
+          return;
+        }
+        const spans = Array.from(outputTable.querySelectorAll('[data-taggable="unmark"], [data-taggable="true"]'));
+        const uniqueWords = [...new Set(spans.map(s => s.textContent.trim()).filter(w => w.length >= 3))];
+        if (!uniqueWords.length) {
+          aiAssistStatus.textContent = t('aiAssistNoneFound');
+          aiAssistBtn.disabled = false;
+          if (session.destroy) session.destroy();
+          return;
+        }
+        let corrected = 0;
+        for (let i = 0; i < uniqueWords.length; i++) {
+          const word = uniqueWords[i];
+          aiAssistStatus.textContent = t('aiAssistChecking', { done: i + 1, total: uniqueWords.length });
+          const isEnglish = await askDeviceAIIsEnglish(session, word);
+          if (isEnglish === null) continue;
+          if (isEnglish) addUserException(word); else userExceptions.delete(word.toLowerCase());
+          saveUserExceptions();
+          if (typeof learnWord === 'function') learnWord(word, isEnglish);
+          corrected++;
+        }
+        if (session.destroy) session.destroy();
+        if (currentSheetName) renderSheet(currentSheetName);
+        aiAssistStatus.textContent = t('aiAssistDone', { count: corrected });
+        aiAssistBtn.disabled = false;
       });
     }
 

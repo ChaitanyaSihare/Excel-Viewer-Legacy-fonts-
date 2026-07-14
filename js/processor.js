@@ -251,12 +251,21 @@
       try {
         const worksheet = currentWorkbook.Sheets[currentSheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+        const isProtectedWord = (word) => {
+          const lower = word.toLowerCase();
+          if (typeof userExceptions !== 'undefined' && userExceptions.has(lower)) return true;
+          if (typeof KNOWN_ENGLISH_TERMS !== 'undefined' && KNOWN_ENGLISH_TERMS.has(lower)) return true;
+          if (typeof useDictionaryGuess !== 'undefined' && useDictionaryGuess &&
+              typeof ENGLISH_DICTIONARY !== 'undefined' && ENGLISH_DICTIONARY.has(lower) && lower.length >= 3) return true;
+          if (typeof looksStatisticallyEnglish === 'function' && looksStatisticallyEnglish(lower)) return true;
+          return false;
+        };
         const converted = jsonData.map((row, r) => row.map((cell, c) => {
           const text = cell != null ? String(cell) : '';
           if (!text) return text;
           const address = colIndexToLetters(c) + (r + 1);
           if (cellNeedsConversion(address, text)) {
-            try { return krutiDevToUnicode(text); } catch (err) { return text; }
+            try { return krutiDevToUnicode(text, isProtectedWord); } catch (err) { return text; }
           }
           return text;
         }));
@@ -272,4 +281,3 @@
         exportUnicodeBtn.textContent = originalLabel;
       }
     }
-

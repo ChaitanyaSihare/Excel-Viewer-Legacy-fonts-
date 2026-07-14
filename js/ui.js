@@ -346,7 +346,7 @@
 // ---- Manual English-word exceptions (allow-list, tap-to-correct) ----
     const KNOWN_ENGLISH_TERMS = new Set([
       'nil', 'rct', 'fir', 'ipc', 'crpc', 'sho', 'sp', 'dfo', 'ccf', 'pccf',
-      'gpf', 'cpf', 'nps', 'pf', 'esi', 'gis', 'lic', 'pan', 'tds', 'ifsc',
+      'gpf', 'cpf', 'nps', 'pf', 'rf', 'esi', 'gis', 'lic', 'pan', 'tds', 'ifsc',
       'hra', 'da', 'ta', 'gst', 'nagpur', 'dt',
       'agar', 'malwa', 'alirajpur', 'anuppur', 'ashoknagar', 'balaghat',
       'barwani', 'betul', 'bhind', 'bhopal', 'burhanpur', 'chhatarpur',

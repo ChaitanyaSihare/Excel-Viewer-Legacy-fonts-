@@ -115,9 +115,43 @@ const MAIN_MAP = [
   ['\u00ae','\u0948\u0902']
 ];
 
-function krutiDevToUnicode(input) {
+function krutiDevToUnicode(input, isProtectedWord) {
   if (!input || typeof input !== 'string') return input;
   let text = input;
+
+  // ---- Protect case-number / date-like numeric tokens ----
+  // The character map below is a blind, context-free substitution table: it
+  // has no idea "35635/07" is a file number, or "48a" is a legal sub-clause
+  // marker — it just sees valid Kruti Dev glyph codes and converts them,
+  // because '/', '.', and single ASCII letters ARE legitimate Kruti Dev
+  // characters in Devanagari text. So a real case number gets mangled:
+  // "35635/07" -> "35635ध्07", "48a" -> "48ं". Fix: pull out anything that
+  // looks like digits/dates/case-numbers (with up to 2 trailing letters,
+  // e.g. "49b") BEFORE the substitution table runs, and splice the exact
+  // original text back in afterward.
+  const protectedTokens = [];
+  text = text.replace(/\b\d[\d./]*[a-zA-Z]{0,2}\b/g, (match) => {
+    protectedTokens.push(match);
+    return '\u0000' + (protectedTokens.length - 1) + '\u0001';
+  });
+
+  // ---- Protect standalone English words (optional) ----
+  // A digit anchor makes "48a" unambiguous, but a bare word like "Dt" has
+  // none — the file's font metadata says the whole cell is Kruti Dev (true
+  // for most of it), and there's no finer-grained signal to say "except
+  // this word". That's a genuine ambiguity, not a missing-metadata bug: we
+  // checked, real files here never mix two fonts inside one cell, so there
+  // is nothing left to read. The caller can pass isProtectedWord(word) to
+  // reuse the SAME dictionary/exception judgment the viewer already makes,
+  // so a word already known to be real English stays real English on
+  // export too, instead of export being a completely separate blind path.
+  if (typeof isProtectedWord === 'function') {
+    text = text.replace(/\b[A-Za-z]+\b/g, (word) => {
+      if (!isProtectedWord(word)) return word;
+      protectedTokens.push(word);
+      return '\u0000' + (protectedTokens.length - 1) + '\u0001';
+    });
+  }
 
   // space + ्र glyphs collapse onto the previous char
   text = replaceAllLiteral(text, ' \u00aa', '\u00aa');
@@ -173,6 +207,9 @@ function krutiDevToUnicode(input) {
   text = replaceAllLiteral(text, '\u094d\u0930\u094d', '\u0930\u094d');
   text = replaceAllLiteral(text, '\u094d\u094d', '\u094d');
   text = replaceAllLiteral(text, '\u094d ', ' ');
+
+  // Restore the protected numeric/case-number tokens exactly as they were.
+  text = text.replace(/\u0000(\d+)\u0001/g, (m, i) => protectedTokens[Number(i)]);
 
   return text.trim();
 }

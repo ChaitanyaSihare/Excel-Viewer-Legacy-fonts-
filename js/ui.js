@@ -110,7 +110,7 @@
         sheetEnglishLabel: 'यह शीट पूरी तरह अंग्रेज़ी/यूनिकोड में है',
         newFileLabel: 'नई फाइल खोलें',
         searchPlaceholder: 'डेटा खोजें...',
-        dictionaryToggleLabel: 'बिना फॉन्ट-जानकारी वाले सेल में अंग्रेज़ी शब्दकोश से अनुमान लगाएं (जोखिम भरा — बंद रहना बेहतर)',
+        dictionaryToggleLabel: 'बिना फॉन्ट-जानकारी वाले सेल में शब्दकोश और सांख्यिकीय अनुमान से पता लगाएं (जोखिम भरा — बंद रहना बेहतर)',
         aiAssistLabel: 'अस्पष्ट शब्दों की जांच इस डिवाइस के AI से करें',
         aiAssistUnavailable: 'इस ब्राउज़र/डिवाइस पर कोई ऑन-डिवाइस AI उपलब्ध नहीं मिला। कुछ भी कहीं नहीं भेजा गया।',
         aiAssistChecking: 'AI से जांच हो रही है... ({done}/{total})',
@@ -193,7 +193,7 @@
         sheetEnglishLabel: 'This sheet is entirely English/Unicode',
         newFileLabel: 'Open new file',
         searchPlaceholder: 'Search data...',
-        dictionaryToggleLabel: 'Guess using an English dictionary for cells with no font info (risky — best left off)',
+        dictionaryToggleLabel: 'Use dictionary + statistical guessing for cells with no font info (risky — best left off)',
         aiAssistLabel: 'Check ambiguous words using this device\'s AI',
         aiAssistUnavailable: 'No on-device AI was found on this browser/device. Nothing was sent anywhere.',
         aiAssistChecking: 'Checking with AI... ({done}/{total})',
@@ -346,7 +346,7 @@
 // ---- Manual English-word exceptions (allow-list, tap-to-correct) ----
     const KNOWN_ENGLISH_TERMS = new Set([
       'nil', 'rct', 'fir', 'ipc', 'crpc', 'sho', 'sp', 'dfo', 'ccf', 'pccf',
-      'gpf', 'cpf', 'nps', 'pf', 'rf', 'esi', 'gis', 'lic', 'pan', 'tds', 'ifsc',
+      'gpf', 'cpf', 'nps', 'pf', 'esi', 'gis', 'lic', 'pan', 'tds', 'ifsc', 'rf',
       'hra', 'da', 'ta', 'gst', 'nagpur', 'dt',
       'agar', 'malwa', 'alirajpur', 'anuppur', 'ashoknagar', 'balaghat',
       'barwani', 'betul', 'bhind', 'bhopal', 'burhanpur', 'chhatarpur',
@@ -448,9 +448,17 @@
           }
           if (/^[A-Za-z]+$/.test(piece)) {
             const lower = piece.toLowerCase();
-            const dictionaryHit = !trustedLegacy && useDictionaryGuess &&
-              ENGLISH_DICTIONARY.has(lower) && lower.length >= 3;
-            const bigramHit = !trustedLegacy && looksStatisticallyEnglish(lower);
+            // Both of these are STATISTICAL GUESSES, not ground truth — and
+            // unlike font metadata, a wrong guess here does something Excel
+            // itself structurally cannot do: paint part of one cell in a
+            // different font than the rest of it. Excel always uses exactly
+            // one font per cell, so it can never be "half right, half
+            // wrong" the way a mis-firing guess here can. That's why BOTH
+            // guessing signals are opt-in, off by default — the viewer's
+            // default behavior should never be riskier than plain Excel.
+            const guessingEnabled = !trustedLegacy && useDictionaryGuess;
+            const dictionaryHit = guessingEnabled && ENGLISH_DICTIONARY.has(lower) && lower.length >= 3;
+            const bigramHit = guessingEnabled && looksStatisticallyEnglish(lower);
             if (userExceptions.has(lower) || dictionaryHit || bigramHit) {
               return '<span class="run-normal-font" data-taggable="true" title="असली अंग्रेज़ी नहीं है? टैप करें">' + escapeHTML(piece) + '</span>';
             }

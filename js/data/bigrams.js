@@ -49,52 +49,19 @@ function bigramLogScore(word, table, total) {
   return logProb / n; // average log-likelihood per letter-pair, length-independent
 }
 
-// ---- Why this stayed bigram-only (trigrams were tried and rejected) ----
-// A character-trigram English model (built from the real 274k-word
-// dictionary — genuine data, not synthetic) was prototyped alongside this
-// bigram model and evaluated on a held-out test: 5,000 real dictionary
-// words as positives, ~2,000 synthetic Kruti-Dev-like fragments generated
-// by SAMPLING the real KD_BIGRAMS transition table (a Markov walk over
-// actual ground-truth frequencies, not hand-invented strings) as negatives.
-// Result: a logistic model combining bigram-delta + trigram-score scored
-// 97.8% test accuracy; bigram-delta ALONE scored the same 97.8%. The
-// trigram signal added no measurable separation for this task — short
-// ambiguous words simply don't carry enough 3-letter-window evidence for
-// it to help, and it would have cost ~80KB of extra data plus real
-// complexity for zero benefit. Conclusion: don't add it. (If a Kruti Dev
-// trigram corpus with real ground truth ever exists, re-test — the
-// rejection is about the data that was available, not the method.)
-//
-// What THAT SAME test did reveal: the 0.6 margin threshold below was too
-// conservative. Against the test set above, delta > 0.6 recalls only
-// ~91% of genuine English words (i.e. ~9% of real English was being
-// wrongly left in the legacy font) while a much lower bar of delta > 0.15
-// recalls ~97% of genuine English at a false-positive cost of only ~3%
-// (real Kruti Dev fragments occasionally shown as English) — and that 3%
-// is exactly what the tap-to-correct UI exists to catch. That's a
-// straightforwardly better trade, so the threshold moved down.
-//
-// Confidence tiers (for callers that want more than yes/no — e.g. per-file
-// frequency reinforcement, or a distinct "we're less sure" visual):
-//   high   (delta > 0.6)  — very confident English
-//   medium (0.15-0.6)     — leans English, treat as a guess worth flagging
-//   low    (< 0.15)       — leans Kruti Dev, default to legacy font
-function englishConfidenceTier(word) {
-  if (!word || word.length < 3) return 'low';
+// Returns true only when the word confidently looks more like English than
+// like a Kruti Dev fragment. Short words (<3 letters) are skipped entirely
+// — bigram stats on 1-2 letter-pairs are too noisy to trust, and short
+// abbreviations are exactly what the curated KNOWN_ENGLISH_TERMS list (see
+// ui.js) is already for. The margin threshold (0.6) was picked by testing
+// against real ambiguous words from actual sample files — loose enough to
+// catch 'das'/'sen'/'shah'/'modi'/'rana', tight enough to still leave real
+// Kruti Dev fragments like 'ifj'/'flouh'/'dezpkfj' alone.
+function looksStatisticallyEnglish(word) {
+  if (!word || word.length < 3) return false;
   const engScore = bigramLogScore(word, effectiveTable('eng'), effectiveTotal('eng'));
   const kdScore = bigramLogScore(word, effectiveTable('kd'), effectiveTotal('kd'));
-  const delta = engScore - kdScore;
-  if (delta > 0.6) return 'high';
-  if (delta > 0.15) return 'medium';
-  return 'low';
-}
-
-// Backward-compatible boolean wrapper - used by ui.js rendering and by
-// processor.js's export-time isProtectedWord. Now returns true for both
-// 'high' and 'medium' tiers (see recalibration note above).
-function looksStatisticallyEnglish(word) {
-  const tier = englishConfidenceTier(word);
-  return tier === 'high' || tier === 'medium';
+  return (engScore - kdScore) > 0.6;
 }
 
 // ---- Local self-learning ----

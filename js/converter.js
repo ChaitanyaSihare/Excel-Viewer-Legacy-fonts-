@@ -115,7 +115,8 @@ const MAIN_MAP = [
   ['\u00ae','\u0948\u0902']
 ];
 
-function convertNonDevanagariRun(input, isProtectedWord) {
+function krutiDevToUnicode(input, isProtectedWord) {
+  if (!input || typeof input !== 'string') return input;
   let text = input;
 
   // ---- Protect case-number / date-like numeric tokens ----
@@ -150,22 +151,6 @@ function convertNonDevanagariRun(input, isProtectedWord) {
       protectedTokens.push(word);
       return '\u0000' + (protectedTokens.length - 1) + '\u0001';
     });
-  }
-
-  // ---- Bail out before the glyph table if nothing left could be Kruti Dev ----
-  // Once digits/case-numbers and recognized English words are protected
-  // (pulled out above), what's left of this run is either genuine Kruti Dev
-  // glyph-key letters, or — very commonly, in real mixed-language files —
-  // just ordinary ASCII punctuation ('.', '-', '(', ')', etc.) sitting next
-  // to an already-correct Devanagari sentence (e.g. "तह. बरघाट", "(सा.)").
-  // The glyph table below has no way to tell those apart: it will read a
-  // bare '.' as a vowel sign, a '(' as ';', a '-' as another '.', and mangle
-  // sentence punctuation that was never Kruti Dev to begin with. If there
-  // are no bare A-Z/a-z letters left in this run, there is nothing left
-  // that could legitimately need decoding — restore the protected tokens
-  // and return the run untouched rather than risk that corruption.
-  if (!/[A-Za-z]/.test(text)) {
-    return text.replace(/\u0000(\d+)\u0001/g, (m, i) => protectedTokens[Number(i)]);
   }
 
   // space + ्र glyphs collapse onto the previous char
@@ -226,36 +211,5 @@ function convertNonDevanagariRun(input, isProtectedWord) {
   // Restore the protected numeric/case-number tokens exactly as they were.
   text = text.replace(/\u0000(\d+)\u0001/g, (m, i) => protectedTokens[Number(i)]);
 
-  return text;
-}
-
-// ---- Whole-cell entry point ----
-// A real exported file exposed a gap here: a cell can be genuinely correct
-// Hindi Unicode text with English abbreviations and ordinary punctuation
-// mixed in — e.g. "D.R.I. (Directorate ... Investigation) Nagpur Regional
-// Unit के द्वारा...". The first attempt at fixing this only protected
-// contiguous real-Devanagari RUNS and still fed the rest of the cell
-// (single-letter abbreviations like "D.R.I.", plain "(", ".", "-") to the
-// glyph table — which still corrupted them, because those specific
-// characters are ALSO legitimate Kruti Dev glyph keys and there's no way
-// to tell "abbreviation dot" from "glyph dot" once you're only looking at
-// an isolated non-Devanagari fragment.
-//
-// The signal that actually resolves it is simpler and much stronger: does
-// this CELL contain any genuine Unicode Devanagari character anywhere at
-// all? A truly un-migrated, raw Kruti Dev cell is pure ASCII/Latin-1 top
-// to bottom — real Devanagari code points (U+0900-097F) never occur in it,
-// because nothing has decoded it yet. So if even one real Devanagari
-// character shows up anywhere in the cell, that is proof the cell has
-// already been migrated (by a person, at some point), and everything else
-// in it — including short English abbreviations, citation numbers, and
-// stray punctuation — is real content, not an encoding waiting to be
-// decoded. Tested against the actual mixed-encoding file this bug was
-// found in: rows still in raw Kruti Dev contain zero real Devanagari
-// characters; rows already migrated contain real Devanagari throughout.
-// So: any real Devanagari present -> leave the whole cell untouched.
-function krutiDevToUnicode(input, isProtectedWord) {
-  if (!input || typeof input !== 'string') return input;
-  if (DEVANAGARI_RANGE.test(input)) return input;
-  return convertNonDevanagariRun(input, isProtectedWord).trim();
+  return text.trim();
 }

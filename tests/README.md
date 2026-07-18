@@ -35,11 +35,9 @@ silently regress it), add an entry to `EXPECTATIONS` in `run.js`:
 
 ## What's covered right now
 
-- 5 real government files (Beat reports, staff report, wildlife case
-  file, student enrollment) — sheet counts, font-metadata reading,
+- 5 real government files  — sheet counts, font-metadata reading,
   conversion pipeline never throwing.
-- `Vanyaprani_Shikar-_Hamle_for_SP-1.xls` has pinned per-cell
-  expectations (the D.R.I./बरघाट row, the RF-08 case, digit-anchored
+-  the RF-08 case, digit-anchored
   case numbers) — these are the exact real bugs found and fixed during
   development, now locked in as regressions.
 - Synthetic edge cases: `empty.xlsx`, `one_cell.xlsx`, `merged.xlsx`,

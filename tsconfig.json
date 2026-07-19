@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2019",
+    "lib": [
+      "ES2019",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "none",
+    "rootDir": "ts",
+    "outDir": "js",
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "sourceMap": false,
+    "removeComments": false,
+    "newLine": "lf"
+  },
+  "include": [
+    "ts/**/*.ts",
+    "ts/**/*.d.ts"
+  ]
+}

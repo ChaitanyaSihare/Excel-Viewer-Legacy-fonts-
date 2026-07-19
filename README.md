@@ -49,6 +49,9 @@ Just open `index.html` in a browser. That's it — no build step, no server, no 
   on disk via the File System Access API (`js/fileSystemAccess.js`), so "resume" reads
   the file's current content instead of a frozen snapshot. Falls back to the
   IndexedDB snapshot everywhere else automatically.
+- Recent files list (up to 5), separate from the single-slot "resume last file" —
+  jump back to something from earlier in the week, not just the very last file
+  opened. Same on-device-only storage, nothing new to trust.
 
 ## Architecture
 
@@ -109,12 +112,37 @@ for how to pin down expected results for a specific file/cell.
 - **Statistical/dictionary-based conversion is a best-effort guess**, not ground
   truth, for cells with no font metadata at all. Always available: tap-to-correct,
   and the "मूल फॉन्ट" view mode to see the unmodified original.
-- **Font licensing**: KrutiDev/DevLys/Chanakya/Shusha have unclear or restrictive
-  licensing (see project notes) — this app never bundles or redistributes any legacy
-  font. You always supply your own `.ttf`/`.otf` from a file you already have.
+- **Font licensing researched — no single authoritative source exists for any of
+  these fonts**, so this app deliberately never hosts or redistributes any of them.
+  What was actually found, per font:
+  - **Kruti Dev, DevLys**: widely redistributed as "free for personal use" by dozens
+    of third-party sites, but original authorship isn't consistently documented
+    anywhere, and no official government or foundry source was found to point to
+    with confidence. Even the redistributor sites themselves are often explicit that
+    the license label they show is just a guess, not a verified fact, and that an
+    unlabeled font shouldn't be assumed free.
+  - **Shusha**: multiple sources attribute this one to the Indian Type Foundry
+    (1997) and explicitly say commercial use requires contacting the author — more
+    likely to have a real rights holder than Kruti Dev/DevLys. Treat with more
+    caution, not less.
+  - **Chanakya**: conflicting claims — some sources call it ITF-owned/commercial,
+    others call it freely redistributable. Genuinely unresolved.
+  - **Naaz**: could not find licensing information for the actual Hindi legacy
+    typing font of this name at all — searches mostly surface an unrelated
+    decorative Latin/Persian display font that happens to share the name. Unresolved.
+  - Given all of the above, the in-app "font not found" hint (see `processor.js`,
+    `detectFontNameInFile`) deliberately does NOT hardcode a download link to any
+    specific site for any of these fonts — it opens a neutral web search instead,
+    so the user sees and judges the source themselves. This was a decision made
+    once, with reasoning, not something to "fix" by adding a direct link later
+    without redoing this research.
 - **No true virtual scrolling** — large sheets load in chunks (1500 rows) via a "load
   more" button rather than fully virtualizing the DOM.
-- **Formula cells**: not yet given special handling.
+- **Formula cells**: displays the cached calculated value (correct default — a
+  report reader wants the number, not `=SUM(B2:B9)`), marks formula cells with a
+  small corner indicator + tooltip showing the formula, and preserves the formula
+  on Unicode export so the exported file keeps recalculating in Excel rather than
+  freezing to a static snapshot.
 - Single-font-per-cell assumption: real-world files checked so far never mix two
   fonts inside one cell (verified against several government sample files), so this
   hasn't been a practical problem, but isn't structurally guaranteed.

@@ -6,7 +6,7 @@
 // single-page tool with no server API, so there's no "fresh data" to miss
 // by serving from cache). Bump CACHE_VERSION when you ship a change to any
 // file below — that's what forces the old cache to be replaced.
-const CACHE_VERSION = 'yatharoop-v11';
+const CACHE_VERSION = 'yatharoop-v17';
 
 const APP_SHELL = [
   './',

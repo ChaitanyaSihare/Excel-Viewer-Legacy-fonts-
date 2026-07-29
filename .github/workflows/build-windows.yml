@@ -1,0 +1,40 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ branched ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepare web assets
+        shell: bash
+        run: |
+          mkdir -p electron-app/www
+          cp index.html manifest.webmanifest sw.js electron-app/www/
+          cp favicon* apple-touch-icon.png icon-192.png icon-512.png electron-app/www/ 2>/dev/null || true
+          cp -r js electron-app/www/
+
+      - name: Install dependencies
+        working-directory: electron-app
+        run: npm install
+
+      - name: Build EXE
+        working-directory: electron-app
+        run: npx electron-builder --win
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: yatharoop-windows
+          path: electron-app/dist/*.exe

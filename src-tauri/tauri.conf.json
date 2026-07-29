@@ -1,0 +1,22 @@
+{
+  "productName": "Yatharoop",
+  "version": "1.0.0",
+  "identifier": "com.chaitanya.yatharoop",
+  "build": {
+    "frontendDist": "../www"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Yatharoop",
+        "width": 1200,
+        "height": 800
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico"]
+  }
+}

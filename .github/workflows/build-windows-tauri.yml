@@ -1,0 +1,47 @@
+name: Build Windows EXE (Tauri)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ branched ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Prepare web assets
+        shell: bash
+        run: |
+          mkdir -p www
+          cp index.html manifest.webmanifest sw.js www/
+          cp favicon.ico apple-touch-icon.png icon-192.png icon-512.png www/ 2>/dev/null || true
+          cp -r js www/
+
+      - name: Prepare Tauri icon
+        shell: bash
+        run: |
+          mkdir -p src-tauri/icons
+          cp favicon.ico src-tauri/icons/icon.ico
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@next
+
+      - name: Build Tauri app
+        run: tauri build
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: yatharoop-tauri-windows
+          path: src-tauri/target/release/bundle/nsis/*.exe

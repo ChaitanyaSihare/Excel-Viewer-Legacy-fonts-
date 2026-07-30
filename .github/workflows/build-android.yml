@@ -31,10 +31,57 @@ jobs:
           cp -r js www/
 
       - name: Install Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install @capgo/capacitor-share-target @capacitor/filesystem
 
       - name: Add Android platform
         run: npx cap add android
+
+      - name: Add Share Target intent filters
+        shell: bash
+        run: |
+          python3 - << 'EOF'
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path) as f:
+              content = f.read()
+
+          intent_filters = '''
+          <intent-filter>
+              <action android:name="android.intent.action.SEND" />
+              <category android:name="android.intent.category.DEFAULT" />
+              <data android:mimeType="application/vnd.ms-excel" />
+          </intent-filter>
+          <intent-filter>
+              <action android:name="android.intent.action.SEND" />
+              <category android:name="android.intent.category.DEFAULT" />
+              <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+          </intent-filter>
+          <intent-filter>
+              <action android:name="android.intent.action.SEND" />
+              <category android:name="android.intent.category.DEFAULT" />
+              <data android:mimeType="font/ttf" />
+          </intent-filter>
+          <intent-filter>
+              <action android:name="android.intent.action.SEND" />
+              <category android:name="android.intent.category.DEFAULT" />
+              <data android:mimeType="font/otf" />
+          </intent-filter>
+          '''
+
+          content = content.replace('</activity>', intent_filters + '</activity>', 1)
+
+          with open(path, "w") as f:
+              f.write(content)
+          EOF
+
+      - name: Generate app icons
+        run: |
+          npm install @capacitor/assets --save-dev
+          mkdir -p resources
+          cp icon-512.png resources/icon.png
+          cp icon-512.png resources/splash.png
+          npx capacitor-assets generate --android
 
       - name: Fix duplicate Kotlin classes
         run: |
@@ -45,7 +92,7 @@ jobs:
               exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
           }
           EOF
-          
+
       - name: Sync web assets into Android project
         run: npx cap sync android
 
